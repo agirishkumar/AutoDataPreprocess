@@ -1,0 +1,10 @@
+LICENSE
+README.md
+setup.py
+AutoDataPreprocess/AutoDataPreprocess.py
+AutoDataPreprocess/__init__.py
+AutoDataPreprocess.egg-info/PKG-INFO
+AutoDataPreprocess.egg-info/SOURCES.txt
+AutoDataPreprocess.egg-info/dependency_links.txt
+AutoDataPreprocess.egg-info/requires.txt
+AutoDataPreprocess.egg-info/top_level.txt
