@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 asttokens==2.4.1
 attrs==24.2.0
--e git+https://github.com/agirishkumar/AutoDataPreprocess.git@2c51ec36a06d2dad85374c1e9df717e4a19d3360#egg=AutoDataPreprocess
+-e git+https://github.com/agirishkumar/AutoDataPreprocess.git@21f7db23e21247fbdd6387c79baa8bfadc8edac8#egg=AutoDataPreprocess
 certifi==2024.7.4
 charset-normalizer==3.3.2
 comm==0.2.2
@@ -14,6 +14,7 @@ et-xmlfile==1.1.0
 exceptiongroup==1.2.2
 executing==2.0.1
 fonttools==4.53.1
+greenlet==3.0.3
 htmlmin==0.1.12
 idna==3.7
 ImageHash==4.3.1
@@ -64,6 +65,7 @@ scikit-learn==1.5.1
 scipy==1.13.1
 seaborn==0.13.2
 six==1.16.0
+SQLAlchemy==2.0.32
 stack-data==0.6.3
 statsmodels==0.14.2
 threadpoolctl==3.5.0

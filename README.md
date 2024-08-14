@@ -17,24 +17,23 @@ AutoDataPreprocess is a powerful, easy-to-use Python library for automatic prepr
 - [x] XML file loading
 - [x] Pickle file loading
 - [x] HTML file loading
-- [ ] SQL database connector
-- [ ] API data fetcher
+- [x] SQL database connector
+- [x] API data fetcher
 
 ## 3. Data Inspection
 - [x] Basic statistics calculation (mean, median, mode, std dev)
 - [x] Missing value detection and reporting
 - [x] Data type inference
 - [x] Correlation analysis
-- [x] Data quality score
 
 ## 4. Data Cleaning
 - [x] Missing value handler
-  - [ ] Mean imputation
-  - [ ] Median imputation
-  - [ ] Mode imputation
-  - [ ] Forward fill
-  - [ ] Backward fill
-  - [ ] Custom value imputation
+  - [x] Mean imputation
+  - [x] Median imputation
+  - [x] Mode imputation
+  - [x] Forward fill
+  - [x] Backward fill
+  - [x] Custom value imputation
 - [x] Outlier handler
   - [x] IQR method
   - [x] Z-score method

@@ -13,20 +13,33 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder, PolynomialFeatu
 from sklearn.feature_selection import mutual_info_regression, mutual_info_classif
 import os
 from ydata_profiling import ProfileReport
+from sqlalchemy import create_engine
+import requests
 
 
 class AutoDataPreprocess:
-    def __init__(self, filepath):
+    def __init__(self, filepath=None, sql_query=None, sql_connection_string=None, api_url=None, api_params=None):
         """
-        Initializes the AutoDataPreprocess class by loading data from a file.
+        Initializes the AutoDataPreprocess class by loading data from a file, SQL database, or API.
 
         Parameters:
         filepath (str): The path to the file to be loaded.
+        sql_query (str): SQL query to execute if loading from a database.
+        sql_connection_string (str): SQLAlchemy connection string to connect to the database.
+        api_url (str): URL of the API to fetch data from.
+        api_params (dict): Dictionary of query parameters to pass to the API.
 
         Returns:
         None
         """
-        self.data = self.load(filepath)
+        if filepath:
+            self.data = self.load(filepath)
+        elif sql_query and sql_connection_string:
+            self.data = self.load_from_sql(sql_query, sql_connection_string)
+        elif api_url:
+            self.data = self.load_from_api(api_url, api_params)
+        else:
+            raise ValueError("Either filepath, SQL query and connection string, or API URL must be provided.")
 
     def load(self, filepath):
         """
@@ -72,6 +85,46 @@ class AutoDataPreprocess:
         except Exception as e:
             raise ValueError(f"Error reading file {filepath}: {str(e)}")
         
+    def load_from_sql(self, query, connection_string):
+        """
+        Load data from a SQL database.
+
+        Parameters:
+        query (str): SQL query to execute.
+        connection_string (str): SQLAlchemy connection string to connect to the database.
+
+        Returns:
+        pandas.DataFrame: Loaded data from SQL database.
+        """
+        try:
+            engine = create_engine(connection_string)
+            df = pd.read_sql(query, engine)
+            print("Data loaded successfully from SQL database.")
+            return df
+        except Exception as e:
+            raise ValueError(f"Error loading data from SQL database: {str(e)}")
+
+    def load_from_api(self, url, params=None):
+        """
+        Load data from an API.
+
+        Parameters:
+        url (str): URL of the API.
+        params (dict): Dictionary of query parameters to pass to the API.
+
+        Returns:
+        pandas.DataFrame: Loaded data from API.
+        """
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()  # Raise HTTPError for bad responses
+            data = response.json()
+            df = pd.DataFrame(data)
+            print("Data loaded successfully from API.")
+            return df
+        except Exception as e:
+            raise ValueError(f"Error loading data from API: {str(e)}")
+
     def memory_usage_analysis(self):
         """
         Analyze and display memory usage of the dataset.
@@ -311,7 +364,7 @@ class AutoDataPreprocess:
             print(f"Dropping columns with more than {drop_threshold*100}% missing values: {list(cols_to_drop)}")
         return df.drop(columns=cols_to_drop)
 
-    def handle_missing_values(self, df, strategy):
+    def handle_missing_values(self, df, strategy='mean', fill_value=None):
         """
         Handle missing values in the dataset.
         """
@@ -331,6 +384,21 @@ class AutoDataPreprocess:
             cat_imputer = SimpleImputer(strategy='most_frequent')
             df[categorical_columns] = cat_imputer.fit_transform(df[categorical_columns])
         
+        elif strategy == 'ffill':
+            print("Forward filling missing values.")
+            df = df.fillna(method='ffill')
+
+        elif strategy == 'bfill':
+            print("Backward filling missing values.")
+            df = df.fillna(method='bfill')
+
+        elif strategy == 'constant':
+            if fill_value is None:
+                raise ValueError("For 'constant' strategy, fill_value must be provided.")
+            print(f"Filling missing values with custom value: {fill_value}")
+            df = df.fillna(value=fill_value)
+
+
         elif strategy == 'knn':
             print("Imputing missing values using KNN strategy.")
             imputer = KNNImputer(n_neighbors=5)
@@ -424,18 +492,18 @@ class AutoDataPreprocess:
         return df.dropna()
 
     def clean(self, missing='mean', outliers='iqr', drop_threshold=0.7, date_format=None, 
-              remove_duplicates=True, iso_forest_contamination=0.1):
+              remove_duplicates=True, iso_forest_contamination=0.1, fill_value=None):
         """
         Clean the dataset by handling missing values, outliers, duplicates, and performing basic cleaning tasks.
         
         Parameters:
-        missing (str): Method to handle missing values. Options: 'mean', 'median', 'mode', 'knn', 'mice', 'drop'
+        missing (str): Method to handle missing values. Method to handle missing values. Options: 'mean', 'median', 'mode', 'ffill', 'bfill', 'constant', 'knn', 'mice', 'drop'
         outliers (str): Method to handle outliers. Options: 'iqr', 'zscore', 'isolation_forest', 'winsorize', None
         drop_threshold (float): Threshold for dropping columns with too many missing values (0.0 to 1.0)
         date_format (str): Format string for parsing dates (e.g., '%Y-%m-%d')
         remove_duplicates (bool): Whether to remove duplicate rows
         iso_forest_contamination (float): Contamination factor for Isolation Forest method.
-        chunk_size (int): Number of rows to process at a time to manage memory usage for very large datasets.
+        fill_value (any): Custom value for 'constant' strategy.
 
         Returns:
         pandas.DataFrame: Cleaned dataset
@@ -446,7 +514,7 @@ class AutoDataPreprocess:
         print("Starting data cleaning process...")
 
         df = self.drop_columns_with_missing_values(df, drop_threshold)
-        df = self.handle_missing_values(df, missing)
+        df = self.handle_missing_values(df, strategy=missing, fill_value=fill_value)
         df = self.handle_outliers(df, outliers, iso_forest_contamination)
         if remove_duplicates:
             df = self.remove_duplicate_rows(df)
