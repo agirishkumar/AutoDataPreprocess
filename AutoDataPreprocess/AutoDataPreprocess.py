@@ -13,13 +13,27 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler,Sta
 from sklearn.feature_selection import mutual_info_regression, mutual_info_classif
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder, OrdinalEncoder
 from sklearn.preprocessing import Normalizer
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+from sklearn.linear_model import Lasso, Ridge
+from sklearn.feature_selection import SelectFromModel, VarianceThreshold
 from category_encoders import TargetEncoder, WOEEncoder, JamesSteinEncoder, CatBoostEncoder, FrequencyEncoder, BinaryEncoder
 import os
+import umap
 from ydata_profiling import ProfileReport
 from sqlalchemy import create_engine
 import requests
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+from imblearn.under_sampling import RandomUnderSampler, TomekLinks
+from statsmodels.tsa.seasonal import seasonal_decompose
+from scipy.signal import detrend
+from scipy.fftpack import fft
+import hashlib
+import random
+import string
 
 
+VarianceThreshold
 class AutoDataPreprocess:
     def __init__(self, filepath=None, sql_query=None, sql_connection_string=None, api_url=None, api_params=None):
         """
@@ -865,14 +879,678 @@ class AutoDataPreprocess:
         print("Normalization process completed.")
         self.data = df
         return df
+    
+    def pca_reduction(self, n_components=2):
+        """
+        Apply Principal Component Analysis (PCA) to reduce dimensionality.
 
-    def balance(self, method='smote'):
-        # Implement balancing here
-        pass
+        Parameters:
+        n_components (int): Number of principal components to keep.
+
+        Returns:
+        pandas.DataFrame: DataFrame with principal components.
+        """
+        df = self.data.select_dtypes(include=[np.number]).copy()  # Only numeric data
+        pca = PCA(n_components=n_components)
+        pca_components = pca.fit_transform(df)
+        
+        # Create a DataFrame with the principal components
+        pca_df = pd.DataFrame(data=pca_components, columns=[f'PC{i+1}' for i in range(n_components)])
+        
+        print(f"PCA completed with {n_components} components.")
+        
+        return pd.concat([self.data.drop(columns=df.columns), pca_df], axis=1)
+
+    def tsne_reduction(self, n_components=2, perplexity=30.0, n_iter=1000):
+        """
+        Apply t-SNE to reduce dimensionality.
+
+        Parameters:
+        n_components (int): Number of dimensions to reduce to (usually 2 or 3).
+        perplexity (float): Perplexity parameter for t-SNE.
+        n_iter (int): Number of iterations for optimization.
+
+        Returns:
+        pandas.DataFrame: DataFrame with t-SNE components.
+        """
+        df = self.data.select_dtypes(include=[np.number]).copy()  # Only numeric data
+        tsne = TSNE(n_components=n_components, perplexity=perplexity, n_iter=n_iter)
+        tsne_components = tsne.fit_transform(df)
+        
+        # Create a DataFrame with the t-SNE components
+        tsne_df = pd.DataFrame(data=tsne_components, columns=[f't-SNE{i+1}' for i in range(n_components)])
+        
+        print(f"t-SNE completed with {n_components} components.")
+        
+        return pd.concat([self.data.drop(columns=df.columns), tsne_df], axis=1)
+
+    def umap_reduction(self, n_components=2, n_neighbors=15, min_dist=0.1):
+        """
+        Apply UMAP to reduce dimensionality.
+
+        Parameters:
+        n_components (int): Number of dimensions to reduce to (usually 2 or 3).
+        n_neighbors (int): Number of neighbors considered for UMAP.
+        min_dist (float): Minimum distance between points in the low-dimensional space.
+
+        Returns:
+        pandas.DataFrame: DataFrame with UMAP components.
+        """
+        df = self.data.select_dtypes(include=[np.number]).copy()  # Only numeric data
+        umap_model = umap.UMAP(n_components=n_components, n_neighbors=n_neighbors, min_dist=min_dist)
+        umap_components = umap_model.fit_transform(df)
+        
+        # Create a DataFrame with the UMAP components
+        umap_df = pd.DataFrame(data=umap_components, columns=[f'UMAP{i+1}' for i in range(n_components)])
+        
+        print(f"UMAP completed with {n_components} components.")
+        
+        return pd.concat([self.data.drop(columns=df.columns), umap_df], axis=1)
 
     def dimreduction(self, method='pca', n_components=5):
-        # Implement dimensionality reduction here
-        pass
+        """
+        Perform dimensionality reduction on the dataset.
+
+        Parameters:
+        method (str): The dimensionality reduction method. Options: 'pca', 'tsne', 'umap'
+        n_components (int): Number of components to keep
+
+        Returns:
+        pandas.DataFrame: Dataset with reduced dimensions
+        """
+        df = self.data.copy()
+
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+
+        if method == 'pca':
+            print(f"Applying PCA with {n_components} components.")
+            pca = PCA(n_components=n_components)
+            reduced_data = pca.fit_transform(df[numeric_columns])
+        elif method == 'tsne':
+            print(f"Applying t-SNE with {n_components} components.")
+            tsne = TSNE(n_components=n_components)
+            reduced_data = tsne.fit_transform(df[numeric_columns])
+        elif method == 'umap':
+            print(f"Applying UMAP with {n_components} components.")
+            umap_reducer = umap.UMAP(n_components=n_components)
+            reduced_data = umap_reducer.fit_transform(df[numeric_columns])
+        else:
+            raise ValueError(f"Unsupported dimensionality reduction method: {method}")
+
+        reduced_df = pd.DataFrame(reduced_data, columns=[f'{method}_component_{i+1}' for i in range(n_components)])
+        return pd.concat([df, reduced_df], axis=1)
+
+    def correlation_selector(self, target_column, threshold=0.8):
+        """
+        Select features based on correlation with the target and remove highly correlated features.
+
+        Parameters:
+        target_column (str): Target column for correlation analysis.
+        threshold (float): Correlation threshold for feature selection.
+
+        Returns:
+        pandas.DataFrame: DataFrame with selected features.
+        """
+        df = self.data.copy()
+        corr_matrix = df.corr()
+        target_corr = corr_matrix[target_column].abs().sort_values(ascending=False)
+        
+        # Select features with correlation above the threshold with the target
+        selected_features = target_corr[target_corr > threshold].index.tolist()
+        
+        # Remove features that are highly correlated with each other
+        for i in range(len(selected_features)):
+            for j in range(i+1, len(selected_features)):
+                if abs(corr_matrix.loc[selected_features[i], selected_features[j]]) > threshold:
+                    selected_features.remove(selected_features[j])
+        
+        print(f"Selected features based on correlation with threshold {threshold}.")
+        return df[selected_features]
+    
+    def mutual_info_selector(self, target_column, n_features=10):
+        """
+        Select features based on mutual information with the target variable.
+
+        Parameters:
+        target_column (str): Target column for mutual information analysis.
+        n_features (int): Number of top features to select.
+
+        Returns:
+        pandas.DataFrame: DataFrame with selected features.
+        """
+        X = self.data.drop(columns=[target_column])
+        y = self.data[target_column]
+        
+        if y.dtype == 'object' or y.dtype.name == 'category':
+            mi_scores = mutual_info_classif(X, y)
+        else:
+            mi_scores = mutual_info_regression(X, y)
+        
+        mi_scores = pd.Series(mi_scores, index=X.columns).sort_values(ascending=False)
+        selected_features = mi_scores.head(n_features).index.tolist()
+        
+        print(f"Selected top {n_features} features based on mutual information.")
+        return self.data[selected_features + [target_column]]
+
+    def variance_threshold_selector(self, threshold=0.01):
+        """
+        Select features based on variance threshold.
+
+        Parameters:
+        threshold (float): Variance threshold for feature selection.
+
+        Returns:
+        pandas.DataFrame: DataFrame with selected features.
+        """
+        df = self.data.select_dtypes(include=[np.number]).copy()  # Only numeric data
+        selector = VarianceThreshold(threshold=threshold)
+        selector.fit(df)
+        selected_columns = df.columns[selector.get_support()]
+        
+        print(f"Selected features with variance above {threshold}.")
+        return self.data[selected_columns]
+    
+    def model_based_selector(self, target_column, model_type='random_forest', 
+                         n_features=None, alpha=1.0, random_state=42):
+        """
+        Select features based on model feature importance or coefficients.
+
+        Parameters:
+        target_column (str): Target column for feature selection.
+        model_type (str): Type of model to use for feature selection.
+                        Options: 'random_forest', 'lasso', 'ridge'
+        n_features (int): Number of top features to select. If None, selects all above a threshold.
+        alpha (float): Regularization strength for Lasso or Ridge (ignored for random_forest).
+        random_state (int): Random state for model reproducibility.
+
+        Returns:
+        pandas.DataFrame: DataFrame with selected features.
+        """
+        X = self.data.drop(columns=[target_column])
+        y = self.data[target_column]
+        
+        if model_type == 'random_forest':
+            # Choose the right model based on the target type
+            if y.dtype == 'object' or y.dtype.name == 'category':
+                model = RandomForestClassifier(n_estimators=100, random_state=random_state)
+            else:
+                model = RandomForestRegressor(n_estimators=100, random_state=random_state)
+        
+        elif model_type == 'lasso':
+            model = Lasso(alpha=alpha, random_state=random_state)
+        
+        elif model_type == 'ridge':
+            model = Ridge(alpha=alpha, random_state=random_state)
+        
+        else:
+            raise ValueError(f"Unknown model_type: {model_type}. Supported types: 'random_forest', 'lasso', 'ridge'")
+        
+        # Fit the model
+        model.fit(X, y)
+        
+        if model_type == 'random_forest':
+            # Use feature importances for RandomForest
+            selector = SelectFromModel(model, prefit=True, max_features=n_features)
+        else:
+            # Use coefficients for Lasso or Ridge
+            selector = SelectFromModel(model, prefit=True)
+        
+        selected_features = X.columns[selector.get_support()]
+        
+        print(f"Selected features based on {model_type} model.")
+        
+        return self.data[selected_features.tolist() + [target_column]]
+
+    def feature_selection(self, target_column, method='correlation', n_features=None, 
+                      correlation_threshold=0.8, model_type='random_forest', alpha=1.0, 
+                      variance_threshold=0.0, random_state=42):
+        """
+        Unified method for feature selection using various techniques.
+
+        Parameters:
+        target_column (str): The name of the target column for feature selection.
+        method (str): Feature selection method to use.
+                    Options: 'correlation', 'mutual_info', 'variance', 'model_based'
+        n_features (int): Number of top features to select (if applicable).
+        correlation_threshold (float): Threshold for correlation-based feature selection.
+        model_type (str): Model to use for model-based feature selection ('random_forest', 'lasso', 'ridge').
+        alpha (float): Regularization strength for Lasso or Ridge (only used if model_type is 'lasso' or 'ridge').
+        variance_threshold (float): Threshold for variance-based feature selection.
+        random_state (int): Random state for reproducibility in model-based methods.
+
+        Returns:
+        pandas.DataFrame: DataFrame with selected features.
+        """
+        if method == 'correlation':
+            return self.correlation_based_selector(target_column, threshold=correlation_threshold)
+        
+        elif method == 'mutual_info':
+            return self.mutual_info_selector(target_column, n_features=n_features)
+        
+        elif method == 'variance':
+            return self.variance_threshold_selector(target_column, threshold=variance_threshold)
+        
+        elif method == 'model_based':
+            return self.model_based_selector(target_column, model_type=model_type, 
+                                            n_features=n_features, alpha=alpha, 
+                                            random_state=random_state)
+        else:
+            raise ValueError(f"Unknown method '{method}'. Supported methods: 'correlation', 'mutual_info', 'variance', 'model_based'.")
+
+
+
+    def balance_data(self, target_column, method='smote', sampling_strategy='auto', random_state=42):
+        """
+        Handle imbalanced data using various techniques.
+
+        Parameters:
+        target_column (str): The name of the target column.
+        method (str): The balancing technique to use.
+                    Options: 'random_over', 'smote', 'random_under', 'tomek_links'
+        sampling_strategy (str or dict): Sampling strategy for the balancing technique.
+                                        Default is 'auto'. For SMOTE, you can specify a dict to over-sample specific classes.
+        random_state (int): Random state for reproducibility.
+
+        Returns:
+        pandas.DataFrame: Balanced DataFrame.
+        """
+        X = self.data.drop(columns=[target_column])
+        y = self.data[target_column]
+
+        if method == 'random_over':
+            return self.random_over_sampler(X, y, sampling_strategy, random_state)
+        
+        elif method == 'smote':
+            return self.smote_sampler(X, y, sampling_strategy, random_state)
+        
+        elif method == 'random_under':
+            return self.random_under_sampler(X, y, sampling_strategy, random_state)
+        
+        elif method == 'tomek_links':
+            return self.tomek_links_sampler(X, y)
+        
+        else:
+            raise ValueError(f"Unknown method '{method}'. Supported methods: 'random_over', 'smote', 'random_under', 'tomek_links'.")
+
+    def random_over_sampler(self, X, y, sampling_strategy, random_state):
+        print("\nApplying Random Over-Sampling.")
+        ros = RandomOverSampler(sampling_strategy=sampling_strategy, random_state=random_state)
+        X_res, y_res = ros.fit_resample(X, y)
+        return pd.concat([X_res, y_res], axis=1)
+    
+    def smote_sampler(self, X, y, sampling_strategy, random_state):
+        print("\nApplying SMOTE.")
+        smote = SMOTE(sampling_strategy=sampling_strategy, random_state=random_state)
+        X_res, y_res = smote.fit_resample(X, y)
+        return pd.concat([X_res, y_res], axis=1)
+    
+    def random_under_sampler(self, X, y, sampling_strategy, random_state):
+        print("\nApplying Random Under-Sampling.")
+        rus = RandomUnderSampler(sampling_strategy=sampling_strategy, random_state=random_state)
+        X_res, y_res = rus.fit_resample(X, y)
+        return pd.concat([X_res, y_res], axis=1)
+    
+    def tomek_links_sampler(self, X, y):
+        print("\nApplying Tomek Links.")
+        tl = TomekLinks()
+        X_res, y_res = tl.fit_resample(X, y)
+        return pd.concat([X_res, y_res], axis=1)
+    
+    def resample_time_series(self, df, time_column, freq='D', method='mean'):
+        """
+        Resample the time series data.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the time series data.
+        time_column (str): The name of the column containing the datetime information.
+        freq (str): The frequency to resample the data to (e.g., 'D' for daily, 'M' for monthly).
+        method (str): The method to apply for aggregation ('mean', 'sum', 'min', 'max').
+
+        Returns:
+        pandas.DataFrame: Resampled DataFrame.
+        """
+        df[time_column] = pd.to_datetime(df[time_column])
+        df.set_index(time_column, inplace=True)
+
+        if method == 'mean':
+            resampled_df = df.resample(freq).mean()
+        elif method == 'sum':
+            resampled_df = df.resample(freq).sum()
+        elif method == 'min':
+            resampled_df = df.resample(freq).min()
+        elif method == 'max':
+            resampled_df = df.resample(freq).max()
+        else:
+            raise ValueError(f"Unsupported resampling method: {method}")
+
+        resampled_df = resampled_df.reset_index()
+        return resampled_df
+
+    def detrend_time_series(self, df, columns):
+        """
+        Remove the trend from the time series data.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the time series data.
+        columns (list): List of column names to detrend.
+
+        Returns:
+        pandas.DataFrame: Detrended DataFrame.
+        """
+        for col in columns:
+            print(f"\nDetrending column: {col}")
+            df[f'{col}_detrended'] = detrend(df[col])
+        return df
+
+    def adjust_seasonality(self, df, columns, model='additive', period=None):
+        """
+        Adjust for seasonality in the time series data.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the time series data.
+        columns (list): List of column names to adjust for seasonality.
+        model (str): The type of seasonal adjustment ('additive' or 'multiplicative').
+        period (int): The periodicity of the seasonality (e.g., 12 for monthly data).
+
+        Returns:
+        pandas.DataFrame: DataFrame with seasonality-adjusted features.
+        """
+        for col in columns:
+            print(f"\nAdjusting seasonality for column: {col}")
+            decomposition = seasonal_decompose(df[col], model=model, period=period)
+            df[f'{col}_seasonal_adjusted'] = df[col] - decomposition.seasonal if model == 'additive' else df[col] / decomposition.seasonal
+        return df
+
+    def create_lag_features(self, df, columns, lags=[1, 2, 3]):
+        """
+        Create lag features for time series forecasting.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the time series data.
+        columns (list): List of column names to create lag features for.
+        lags (list): List of lag periods to create features for.
+
+        Returns:
+        pandas.DataFrame: DataFrame with lag features.
+        """
+        for col in columns:
+            for lag in lags:
+                df[f'{col}_lag_{lag}'] = df[col].shift(lag)
+        return df
+
+    def time_series_preprocessing(self, time_column, freq='D', method='mean', detrend_columns=None, seasonality_columns=None,
+                                  seasonality_model='additive', seasonality_period=None, lag_columns=None, lags=[1, 2, 3]):
+        """
+        Perform comprehensive time series preprocessing including resampling, detrending, seasonality adjustment, and lag feature creation.
+
+        Parameters:
+        time_column (str): The name of the column containing the datetime information.
+        freq (str): The frequency to resample the data to.
+        method (str): The method to apply for aggregation in resampling.
+        detrend_columns (list): List of column names to detrend.
+        seasonality_columns (list): List of column names to adjust for seasonality.
+        seasonality_model (str): The type of seasonal adjustment ('additive' or 'multiplicative').
+        seasonality_period (int): The periodicity of the seasonality.
+        lag_columns (list): List of column names to create lag features for.
+        lags (list): List of lag periods to create features for.
+
+        Returns:
+        pandas.DataFrame: Preprocessed DataFrame.
+        """
+        df = self.data.copy()
+
+        print("\nResampling the time series data...")
+        df = self.resample_time_series(df, time_column, freq, method)
+
+        if detrend_columns:
+            print("\nDetrending the time series data...")
+            df = self.detrend_time_series(df, detrend_columns)
+
+        if seasonality_columns:
+            print("\nAdjusting for seasonality...")
+            df = self.adjust_seasonality(df, seasonality_columns, model=seasonality_model, period=seasonality_period)
+
+        if lag_columns:
+            print("\nCreating lag features...")
+            df = self.create_lag_features(df, lag_columns, lags)
+
+        self.data = df
+        return df
+    
+    def rolling_statistics(self, df, columns, window=3, statistics=['mean', 'std']):
+        """
+        Calculate rolling statistics for time series data.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the time series data.
+        columns (list): List of column names to calculate rolling statistics for.
+        window (int): The size of the rolling window.
+        statistics (list): List of statistics to calculate ('mean', 'std', 'var', 'min', 'max').
+
+        Returns:
+        pandas.DataFrame: DataFrame with rolling statistics.
+        """
+        for col in columns:
+            for stat in statistics:
+                if stat == 'mean':
+                    df[f'{col}_rolling_mean_{window}'] = df[col].rolling(window=window).mean()
+                elif stat == 'std':
+                    df[f'{col}_rolling_std_{window}'] = df[col].rolling(window=window).std()
+                elif stat == 'var':
+                    df[f'{col}_rolling_var_{window}'] = df[col].rolling(window=window).var()
+                elif stat == 'min':
+                    df[f'{col}_rolling_min_{window}'] = df[col].rolling(window=window).min()
+                elif stat == 'max':
+                    df[f'{col}_rolling_max_{window}'] = df[col].rolling(window=window).max()
+                else:
+                    raise ValueError(f"Unsupported rolling statistic: {stat}")
+        return df
+
+    def difference_time_series(self, df, columns, periods=1):
+        """
+        Apply differencing to make the time series data stationary.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the time series data.
+        columns (list): List of column names to difference.
+        periods (int): The number of periods to shift for differencing.
+
+        Returns:
+        pandas.DataFrame: Differenced DataFrame.
+        """
+        for col in columns:
+            print(f"\nDifferencing column: {col}")
+            df[f'{col}_diff_{periods}'] = df[col].diff(periods=periods)
+        return df
+
+    def fourier_transform(self, df, columns):
+        """
+        Apply Fourier Transform to extract frequency components from time series data.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame containing the time series data.
+        columns (list): List of column names to apply Fourier Transform on.
+
+        Returns:
+        pandas.DataFrame: DataFrame with Fourier components.
+        """
+        for col in columns:
+            print(f"\nApplying Fourier Transform to column: {col}")
+            fft_values = fft(df[col].dropna())
+            df[f'{col}_fft_real'] = np.real(fft_values)
+            df[f'{col}_fft_imag'] = np.imag(fft_values)
+            df[f'{col}_fft_abs'] = np.abs(fft_values)
+            df[f'{col}_fft_angle'] = np.angle(fft_values)
+        return df
+
+    def time_series_preprocessing(self, time_column, freq='D', method='mean', detrend_columns=None, seasonality_columns=None,
+                                  seasonality_model='additive', seasonality_period=None, lag_columns=None, lags=[1, 2, 3],
+                                  rolling_columns=None, rolling_window=3, rolling_stats=['mean', 'std'], difference_columns=None,
+                                  difference_periods=1, fourier_columns=None):
+        """
+        Perform comprehensive time series preprocessing including resampling, detrending, seasonality adjustment, lag feature creation,
+        rolling statistics, differencing, and Fourier Transform.
+
+        Parameters:
+        time_column (str): The name of the column containing the datetime information.
+        freq (str): The frequency to resample the data to.
+        method (str): The method to apply for aggregation in resampling.
+        detrend_columns (list): List of column names to detrend.
+        seasonality_columns (list): List of column names to adjust for seasonality.
+        seasonality_model (str): The type of seasonal adjustment ('additive' or 'multiplicative').
+        seasonality_period (int): The periodicity of the seasonality.
+        lag_columns (list): List of column names to create lag features for.
+        lags (list): List of lag periods to create features for.
+        rolling_columns (list): List of column names to calculate rolling statistics for.
+        rolling_window (int): The size of the rolling window.
+        rolling_stats (list): List of statistics to calculate ('mean', 'std', 'var', 'min', 'max').
+        difference_columns (list): List of column names to apply differencing.
+        difference_periods (int): The number of periods to shift for differencing.
+        fourier_columns (list): List of column names to apply Fourier Transform on.
+
+        Returns:
+        pandas.DataFrame: Preprocessed DataFrame.
+        """
+        df = self.data.copy()
+
+        print("Resampling time series data")
+        df = self.resample_time_series(df, time_column, freq, method)
+        
+        if detrend_columns:
+            print("\nDetrending time series data")
+            df = self.detrend_time_series(df, detrend_columns)
+        
+        if seasonality_columns:
+            print("\nAdjusting for seasonality")
+            df = self.adjust_seasonality(df, seasonality_columns, model=seasonality_model, period=seasonality_period)
+
+        if lag_columns:
+            print("\nCreating lag features")
+            df = self.create_lag_features(df, lag_columns, lags)
+
+        if rolling_columns:
+            print("\nCalculating rolling statistics")
+            df = self.rolling_statistics(df, rolling_columns, window=rolling_window, statistics=rolling_stats)
+
+        if difference_columns:
+            print("\nApplying differencing")
+            df = self.difference_time_series(df, difference_columns, periods=difference_periods)
+
+        if fourier_columns:
+            print("\nApplying Fourier Transform")
+            df = self.fourier_transform(df, fourier_columns)
+
+        self.data = df
+        return df
+    
+    def anonymize_data(self, columns, method='hash', mask_char='*', hash_algorithm='sha256'):
+        """
+        Anonymize data in specified columns using hashing or data masking.
+
+        Parameters:
+        columns (list): List of column names to anonymize.
+        method (str): Method to use for anonymization ('hash' or 'mask').
+        mask_char (str): Character to use for masking (if method is 'mask').
+        hash_algorithm (str): Hashing algorithm to use ('md5', 'sha1', 'sha256', etc.).
+
+        Returns:
+        pandas.DataFrame: DataFrame with anonymized data.
+        """
+        df = self.data.copy()
+
+        for col in columns:
+            if col in df.columns:
+                if method == 'hash':
+                    df[col] = df[col].apply(lambda x: self._hash_value(str(x), hash_algorithm))
+                elif method == 'mask':
+                    df[col] = df[col].apply(lambda x: self._mask_value(str(x), mask_char))
+                else:
+                    raise ValueError(f"Unsupported anonymization method: {method}")
+
+        self.data = df
+        return df
+
+    def _hash_value(self, value, algorithm):
+        """
+        Hash a given value using the specified algorithm.
+
+        Parameters:
+        value (str): The value to hash.
+        algorithm (str): The hash algorithm to use ('md5', 'sha1', 'sha256', etc.).
+
+        Returns:
+        str: The hashed value.
+        """
+        try:
+            hash_function = getattr(hashlib, algorithm)
+            return hash_function(value.encode()).hexdigest()
+        except AttributeError:
+            raise ValueError(f"Unsupported hash algorithm: {algorithm}")
+
+    def _mask_value(self, value, mask_char='*'):
+        """
+        Mask a given value with a specified character.
+
+        Parameters:
+        value (str): The value to mask.
+        mask_char (str): The character to use for masking.
+
+        Returns:
+        str: The masked value.
+        """
+        return mask_char * len(value)
+
+    def randomize_characters(self, value, proportion=0.5):
+        """
+        Randomize characters in a string for anonymization.
+
+        Parameters:
+        value (str): The string to randomize.
+        proportion (float): Proportion of characters to randomize (0.0 to 1.0).
+
+        Returns:
+        str: The string with randomized characters.
+        """
+        if not 0.0 <= proportion <= 1.0:
+            raise ValueError("Proportion must be between 0.0 and 1.0")
+
+        value = list(value)
+        num_chars_to_randomize = int(len(value) * proportion)
+        indices_to_randomize = random.sample(range(len(value)), num_chars_to_randomize)
+
+        for i in indices_to_randomize:
+            value[i] = random.choice(string.ascii_letters + string.digits)
+
+        return ''.join(value)
+
+    def apply_anonymization(self, columns, method='randomize', proportion=0.5, mask_char='*', hash_algorithm='sha256'):
+        """
+        Anonymize data using various techniques including randomization, masking, and hashing.
+
+        Parameters:
+        columns (list): List of columns to anonymize.
+        method (str): Method to use ('randomize', 'mask', 'hash').
+        proportion (float): Proportion of characters to randomize (for 'randomize' method).
+        mask_char (str): Character to use for masking (for 'mask' method).
+        hash_algorithm (str): Hashing algorithm to use (for 'hash' method).
+
+        Returns:
+        pandas.DataFrame: DataFrame with anonymized data.
+        """
+        df = self.data.copy()
+
+        for col in columns:
+            if method == 'randomize':
+                df[col] = df[col].apply(lambda x: self.randomize_characters(str(x), proportion))
+            elif method == 'mask':
+                df[col] = df[col].apply(lambda x: self._mask_value(str(x), mask_char))
+            elif method == 'hash':
+                df[col] = df[col].apply(lambda x: self._hash_value(str(x), hash_algorithm))
+            else:
+                raise ValueError(f"Unsupported anonymization method: {method}")
+
+        self.data = df
+        return df
 
 def load(filepath):
     return AutoDataPreprocess(filepath)

@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 asttokens==2.4.1
 attrs==24.2.0
--e git+https://github.com/agirishkumar/AutoDataPreprocess.git@780ff84d1662d9f5bf0b5b2666714badf35c0503#egg=AutoDataPreprocess
+-e git+https://github.com/agirishkumar/AutoDataPreprocess.git@9c7775147b39106789481ea1d73e023370e99e68#egg=AutoDataPreprocess
 category-encoders==2.6.3
 certifi==2024.7.4
 charset-normalizer==3.3.2
@@ -19,6 +19,7 @@ greenlet==3.0.3
 htmlmin==0.1.12
 idna==3.7
 ImageHash==4.3.1
+imbalanced-learn==0.12.3
 iniconfig==2.0.0
 ipykernel==6.29.5
 ipython==8.26.0
@@ -54,6 +55,7 @@ pure_eval==0.2.3
 pydantic==2.8.2
 pydantic_core==2.20.1
 Pygments==2.18.0
+pynndescent==0.5.13
 pyparsing==3.1.2
 pytest==8.3.2
 python-dateutil==2.9.0.post0
@@ -77,6 +79,8 @@ traitlets==5.14.3
 typeguard==4.3.0
 typing_extensions==4.12.2
 tzdata==2024.1
+umap==0.1.1
+umap-learn==0.5.6
 urllib3==2.2.2
 visions==0.7.6
 wcwidth==0.2.13

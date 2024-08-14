@@ -64,64 +64,34 @@ AutoDataPreprocess is a powerful, easy-to-use Python library for automatic prepr
 - [x] Robust scaler
 - [x] Normalizer (L1, L2, Max)
 
-## 8. Dimensionality Reduction
-- [ ] Principal Component Analysis (PCA)
-- [ ] t-SNE
-- [ ] UMAP
-- [ ] Feature selector
-  - [ ] Correlation-based
-  - [ ] Mutual information
-  - [ ] Variance threshold
+## 8. Dimensionality reduction and Feature Selection
+- [x] Principal Component Analysis (PCA)
+- [x] t-SNE
+- [x] UMAP
+- [x] Feature selector
+  - [x] Correlation-based
+  - [x] Mutual information
+  - [x] Variance threshold
 
 ## 9. Handling Imbalanced Data
-- [ ] Random over-sampler
-- [ ] SMOTE
-- [ ] Random under-sampler
-- [ ] Tomek links
+- [x] Random over-sampler
+- [x] SMOTE
+- [x] Random under-sampler
+- [x] Tomek links
 
 ## 10. Time Series Preprocessing
-- [ ] Resampler
-- [ ] Detrending
-- [ ] Seasonality adjuster
-- [ ] Lag feature creator
-
-
-## 12. Data Validation
-- [ ] Schema validator
-- [ ] Data integrity checker
-- [ ] Custom rule-based validator
+- [x] Resampler
+- [x] Detrending
+- [x] Seasonality adjuster
+- [x] Lag feature creator
+- [x] Rolling Statistics
+- [x] Differencing
+- [x] Fourier Transform
 
 ## 13. Data Anonymization
-- [ ] Hash function for sensitive information
-- [ ] Data masking tool
-
-## 14. Data Augmentation
-- [ ] Synthetic data generator
-- [ ] Noise injector
-
-## 15. Visualization
-- [ ] Distribution plotter (histograms, KDE)
-- [ ] Correlation heatmap generator
-- [ ] Missing data visualizer
-- [ ] Outlier visualizer
-- [ ] Feature importance plotter
-- [ ] Dimensionality reduction visualizer
-- [ ] Time series visualizer
-- [ ] Before/after comparison plotter
-
-## 16. Pipeline Management
-- [ ] Pipeline saving functionality
-- [ ] Pipeline loading functionality
-- [ ] Pipeline optimization tool
-
-## 17. Automated Preprocessing
-- [ ] Intelligent feature type detector
-- [ ] Automated preprocessing step selector
-- [ ] Hyperparameter tuner for preprocessing steps
-
-## 18. Reporting
-- [ ] Preprocessing summary report generator
-- [ ] Data quality scorecard creator
+- [x] Hash function for sensitive information
+- [x] Data masking tool
+- [x] Randomization
 
 ## 19. Testing
 - [ ] Unit tests for each component
