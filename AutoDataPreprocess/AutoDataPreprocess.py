@@ -9,8 +9,11 @@ from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, PolynomialFeatures
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler,StandardScaler, PolynomialFeatures
 from sklearn.feature_selection import mutual_info_regression, mutual_info_classif
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder, OrdinalEncoder
+from sklearn.preprocessing import Normalizer
+from category_encoders import TargetEncoder, WOEEncoder, JamesSteinEncoder, CatBoostEncoder, FrequencyEncoder, BinaryEncoder
 import os
 from ydata_profiling import ProfileReport
 from sqlalchemy import create_engine
@@ -532,7 +535,7 @@ class AutoDataPreprocess:
 
     def fe(self, target_column=None, polynomial_degree=2, interaction_only=False, 
        bin_numeric=False, num_bins=5, cyclical_features=None, 
-       text_columns=None, date_columns=None):
+       text_columns=None, date_columns=None, math_transformations=None):
         """
         Perform extensive feature engineering on the dataset.
 
@@ -545,6 +548,7 @@ class AutoDataPreprocess:
         cyclical_features (list): List of cyclical features to encode
         text_columns (list): List of text columns for text feature extraction
         date_columns (list): List of date columns for date feature extraction
+        math_transformations (dict): Dictionary of mathematical transformations to apply to numeric features
 
         Returns:
         pandas.DataFrame: Dataset with engineered features
@@ -556,6 +560,10 @@ class AutoDataPreprocess:
         df = self.create_polynomial_features(df, polynomial_degree, interaction_only)
         if bin_numeric:
             df = self.bin_numeric_features(df, num_bins)
+
+        # Apply mathematical transformations
+        if math_transformations:
+            df = self.apply_math_transformations(df, math_transformations)
 
         # Categorical feature engineering
         df = self.create_categorical_interaction_features(df)
@@ -580,92 +588,283 @@ class AutoDataPreprocess:
         self.data = df
         return df
 
-def create_polynomial_features(self, df, degree, interaction_only):
-    print(f"Creating polynomial features of degree {degree}")
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=False)
-    poly_features = poly.fit_transform(df[numeric_columns])
-    poly_features_df = pd.DataFrame(poly_features, columns=poly.get_feature_names(numeric_columns))
-    return pd.concat([df, poly_features_df], axis=1)
+    def create_polynomial_features(self, df, degree, interaction_only):
+        print(f"Creating polynomial features of degree {degree}")
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        poly = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=False)
+        poly_features = poly.fit_transform(df[numeric_columns])
+        poly_features_df = pd.DataFrame(poly_features, columns=poly.get_feature_names(numeric_columns))
+        return pd.concat([df, poly_features_df], axis=1)
 
-def bin_numeric_features(self, df, num_bins):
-    print(f"Binning numeric features into {num_bins} bins")
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_columns:
-        df[f'{col}_binned'] = pd.cut(df[col], bins=num_bins, labels=False)
-    return df
+    def bin_numeric_features(self, df, num_bins):
+        print(f"Binning numeric features into {num_bins} bins")
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_columns:
+            df[f'{col}_binned'] = pd.cut(df[col], bins=num_bins, labels=False)
+        return df
 
-def create_categorical_interaction_features(self, df):
-    print("Creating interaction features for categorical variables")
-    categorical_columns = df.select_dtypes(include=['object', 'category']).columns
-    for i in range(len(categorical_columns)):
-        for j in range(i+1, len(categorical_columns)):
-            col1, col2 = categorical_columns[i], categorical_columns[j]
-            df[f'{col1}_{col2}_interaction'] = df[col1].astype(str) + '_' + df[col2].astype(str)
-    return df
+    def create_categorical_interaction_features(self, df):
+        print("Creating interaction features for categorical variables")
+        categorical_columns = df.select_dtypes(include=['object', 'category']).columns
+        for i in range(len(categorical_columns)):
+            for j in range(i+1, len(categorical_columns)):
+                col1, col2 = categorical_columns[i], categorical_columns[j]
+                df[f'{col1}_{col2}_interaction'] = df[col1].astype(str) + '_' + df[col2].astype(str)
+        return df
 
-def encode_cyclical_features(self, df, cyclical_features):
-    print("Encoding cyclical features")
-    for feature in cyclical_features:
-        if feature in df.columns:
-            max_value = df[feature].max()
-            df[f'{feature}_sin'] = np.sin(2 * np.pi * df[feature]/max_value)
-            df[f'{feature}_cos'] = np.cos(2 * np.pi * df[feature]/max_value)
-    return df
+    def encode_cyclical_features(self, df, cyclical_features):
+        print("Encoding cyclical features")
+        for feature in cyclical_features:
+            if feature in df.columns:
+                max_value = df[feature].max()
+                df[f'{feature}_sin'] = np.sin(2 * np.pi * df[feature]/max_value)
+                df[f'{feature}_cos'] = np.cos(2 * np.pi * df[feature]/max_value)
+        return df
 
-def extract_text_features(self, df, text_columns):
-    print("Extracting features from text columns")
-    for col in text_columns:
-        if col in df.columns:
-            df[f'{col}_length'] = df[col].str.len()
-            df[f'{col}_word_count'] = df[col].str.split().str.len()
-            df[f'{col}_avg_word_length'] = df[col].apply(lambda x: np.mean([len(word) for word in str(x).split()]) if x else 0)
-    return df
+    def extract_text_features(self, df, text_columns):
+        print("Extracting features from text columns")
+        for col in text_columns:
+            if col in df.columns:
+                df[f'{col}_length'] = df[col].str.len()
+                df[f'{col}_word_count'] = df[col].str.split().str.len()
+                df[f'{col}_avg_word_length'] = df[col].apply(lambda x: np.mean([len(word) for word in str(x).split()]) if x else 0)
+        return df
 
-def extract_date_features(self, df, date_columns):
-    print("Extracting features from date columns")
-    for col in date_columns:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col])
-            df[f'{col}_year'] = df[col].dt.year
-            df[f'{col}_month'] = df[col].dt.month
-            df[f'{col}_day'] = df[col].dt.day
-            df[f'{col}_dayofweek'] = df[col].dt.dayofweek
-            df[f'{col}_quarter'] = df[col].dt.quarter
-    return df
+    def extract_date_features(self, df, date_columns):
+        print("Extracting features from date columns")
+        for col in date_columns:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col])
+                df[f'{col}_year'] = df[col].dt.year
+                df[f'{col}_month'] = df[col].dt.month
+                df[f'{col}_day'] = df[col].dt.day
+                df[f'{col}_dayofweek'] = df[col].dt.dayofweek
+                df[f'{col}_quarter'] = df[col].dt.quarter
+        return df
 
-def select_features(self, df, target_column):
-    print("Selecting features based on correlation with target")
-    X = df.drop(columns=[target_column])
-    y = df[target_column]
+    def select_features(self, df, target_column):
+        print("Selecting features based on correlation with target")
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+        
+        if y.dtype == 'object' or y.dtype.name == 'category':
+            mi_scores = mutual_info_classif(X, y)
+        else:
+            mi_scores = mutual_info_regression(X, y)
+        
+        mi_scores = pd.Series(mi_scores, index=X.columns)
+        mi_scores = mi_scores.sort_values(ascending=False)
+        
+        # Select top 20 features or features with MI score > 0.05, whichever is larger
+        selected_features = mi_scores[mi_scores > 0.05].index.tolist()
+        if len(selected_features) < 20:
+            selected_features = mi_scores.nlargest(20).index.tolist()
+        
+        selected_features.append(target_column)
+        return df[selected_features]
+
+    def apply_math_transformations(self, df, transformations=None):
+        """
+        Apply mathematical transformations to numerical features.
+
+        Parameters:
+        df (pandas.DataFrame): The DataFrame to apply transformations to.
+        transformations (dict): A dictionary where keys are column names and values are lists of transformations to apply.
+                                Supported transformations: 'log', 'sqrt', 'reciprocal'.
+
+        Returns:
+        pandas.DataFrame: DataFrame with transformed features.
+        """
+        if transformations is None:
+            transformations = {}
+
+        print("Applying mathematical transformations to numeric features.")
+        
+        for col, trans_list in transformations.items():
+            if col in df.columns and df[col].dtype in [np.float64, np.float32, np.int64, np.int32]:
+                for trans in trans_list:
+                    if trans == 'log':
+                        df[f'{col}_log'] = np.log1p(df[col])  # log1p is used to handle zero and negative values
+                    elif trans == 'sqrt':
+                        df[f'{col}_sqrt'] = np.sqrt(df[col].clip(lower=0))  # clip to avoid sqrt of negative numbers
+                    elif trans == 'reciprocal':
+                        df[f'{col}_reciprocal'] = 1 / df[col].replace(0, np.nan)  # Replace zero to avoid division by zero
+
+        return df
+   
+
+
+    def encode(self, methods=None, target_column=None):
+        """
+        Encode categorical variables using various encoding techniques.
+
+        Parameters:
+        methods (dict): A dictionary where keys are column names and values are encoding methods.
+                        Supported methods: 'onehot', 'label', 'ordinal', 'target', 'woe', 'james_stein', 'catboost', , 'frequency', 'binary'
+        target_column (str): Name of the target column for supervised encoding methods
+
+        Returns:
+        pandas.DataFrame: DataFrame with encoded features
+        """
+        df = self.data.copy()
+        print("Starting encoding process...")
+
+        if methods is None:
+            methods = {col: 'onehot' for col in df.select_dtypes(include=['object', 'category']).columns}
+
+        for col, method in methods.items():
+            if col not in df.columns:
+                print(f"Warning: Column '{col}' not found in the dataset. Skipping.")
+                continue
+
+            if method == 'onehot':
+                df = self._onehot_encode(df, col)
+            elif method == 'label':
+                df = self._label_encode(df, col)
+            elif method == 'ordinal':
+                df = self._ordinal_encode(df, col)
+            elif method == 'target':
+                if target_column is None:
+                    raise ValueError("Target column must be specified for target encoding.")
+                df = self._target_encode(df, col, target_column)
+            elif method == 'woe':
+                if target_column is None:
+                    raise ValueError("Target column must be specified for WOE encoding.")
+                df = self._woe_encode(df, col, target_column)
+            elif method == 'james_stein':
+                if target_column is None:
+                    raise ValueError("Target column must be specified for James-Stein encoding.")
+                df = self._james_stein_encode(df, col, target_column)
+            elif method == 'catboost':
+                if target_column is None:
+                    raise ValueError("Target column must be specified for CatBoost encoding.")
+                df = self._catboost_encode(df, col, target_column)
+            elif method == 'frequency':
+                df = self._frequency_encode(df, col)
+            elif method == 'binary':
+                df = self._binary_encode(df, col)
+            else:
+                print(f"Warning: Unknown encoding method '{method}' for column '{col}'. Skipping.")
+
+        print("Encoding process completed.")
+        self.data = df
+        return df
+
+    def _onehot_encode(self, df, column):
+        print(f"Applying One-Hot encoding to column: {column}")
+        encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+        encoded = encoder.fit_transform(df[[column]])
+        encoded_df = pd.DataFrame(encoded, columns=[f"{column}_{cat}" for cat in encoder.categories_[0]])
+        return pd.concat([df.drop(columns=[column]), encoded_df], axis=1)
+
+    def _label_encode(self, df, column):
+        print(f"Applying Label encoding to column: {column}")
+        encoder = LabelEncoder()
+        df[f"{column}_encoded"] = encoder.fit_transform(df[column])
+        return df
+
+    def _ordinal_encode(self, df, column):
+        print(f"Applying Ordinal encoding to column: {column}")
+        encoder = OrdinalEncoder()
+        df[f"{column}_encoded"] = encoder.fit_transform(df[[column]])
+        return df
+
+    def _target_encode(self, df, column, target_column):
+        print(f"Applying Target encoding to column: {column}")
+        encoder = TargetEncoder()
+        df[f"{column}_target_encoded"] = encoder.fit_transform(df[column], df[target_column])
+        return df
+
+    def _woe_encode(self, df, column, target_column):
+        print(f"Applying Weight of Evidence encoding to column: {column}")
+        encoder = WOEEncoder()
+        df[f"{column}_woe_encoded"] = encoder.fit_transform(df[column], df[target_column])
+        return df
+
+    def _james_stein_encode(self, df, column, target_column):
+        print(f"Applying James-Stein encoding to column: {column}")
+        encoder = JamesSteinEncoder()
+        df[f"{column}_js_encoded"] = encoder.fit_transform(df[column], df[target_column])
+        return df
+
+    def _catboost_encode(self, df, column, target_column):
+        print(f"Applying CatBoost encoding to column: {column}")
+        encoder = CatBoostEncoder()
+        df[f"{column}_catboost_encoded"] = encoder.fit_transform(df[column], df[target_column])
+        return df
     
-    if y.dtype == 'object' or y.dtype.name == 'category':
-        mi_scores = mutual_info_classif(X, y)
-    else:
-        mi_scores = mutual_info_regression(X, y)
-    
-    mi_scores = pd.Series(mi_scores, index=X.columns)
-    mi_scores = mi_scores.sort_values(ascending=False)
-    
-    # Select top 20 features or features with MI score > 0.05, whichever is larger
-    selected_features = mi_scores[mi_scores > 0.05].index.tolist()
-    if len(selected_features) < 20:
-        selected_features = mi_scores.nlargest(20).index.tolist()
-    
-    selected_features.append(target_column)
-    return df[selected_features]
+    def _frequency_encode(self, df, column):
+        print(f"Applying Frequency encoding to column: {column}")
+        encoder = FrequencyEncoder()
+        df[f"{column}_freq_encoded"] = encoder.fit_transform(df[column])
+        return df
 
-    def encode(self, method='onehot'):
-        # Implement encoding here
-        pass
+    def _binary_encode(self, df, column):
+        print(f"Applying Binary encoding to column: {column}")
+        encoder = BinaryEncoder()
+        binary_encoded = encoder.fit_transform(df[column])
+        binary_encoded.columns = [f"{column}_bin_{i}" for i in range(len(binary_encoded.columns))]
+        return pd.concat([df, binary_encoded], axis=1)
 
-    def scale(self, method='standard'):
-        # Implement scaling here
-        pass
+    def scale(self, method='standard', columns=None):
+        """
+        Scale numerical features in the dataset.
 
-    def normalize(self, method='minmax'):
-        # Implement normalization here
-        pass
+        Parameters:
+        method (str): Scaling method to use. Options: 'standard', 'minmax', 'robust'.
+        columns (list): List of columns to scale. If None, scales all numeric columns.
+
+        Returns:
+        pandas.DataFrame: DataFrame with scaled features.
+        """
+        df = self.data.copy()
+        print(f"Starting scaling process using {method} scaling.")
+
+        if columns is None:
+            columns = df.select_dtypes(include=[np.number]).columns
+
+        if method == 'standard':
+            print(f"Applying Standard scaling to columns: {columns}")
+            scaler = StandardScaler()
+        elif method == 'minmax':
+            print(f"Applying Min-Max scaling to columns: {columns}")
+            scaler = MinMaxScaler()
+        elif method == 'robust':
+            print(f"Applying Robust scaling to columns: {columns}")
+            scaler = RobustScaler()
+        else:
+            raise ValueError(f"Unknown scaling method '{method}'.")
+
+        df[columns] = scaler.fit_transform(df[columns])
+
+        print("Scaling process completed.")
+        self.data = df
+        return df
+
+    def normalize(self, method='l2', columns=None):
+        """
+        Normalize numerical features in the dataset.
+
+        Parameters:
+        method (str): Normalization method to use. Options: 'l1', 'l2', 'max'.
+        columns (list): List of columns to normalize. If None, normalizes all numeric columns.
+
+        Returns:
+        pandas.DataFrame: DataFrame with normalized features.
+        """
+        df = self.data.copy()
+        print(f"Starting normalization process using {method} normalization.")
+
+        if columns is None:
+            columns = df.select_dtypes(include=[np.number]).columns
+
+        normalizer = Normalizer(norm=method)
+
+        df[columns] = normalizer.fit_transform(df[columns])
+
+        print("Normalization process completed.")
+        self.data = df
+        return df
 
     def balance(self, method='smote'):
         # Implement balancing here

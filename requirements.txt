@@ -1,7 +1,8 @@
 annotated-types==0.7.0
 asttokens==2.4.1
 attrs==24.2.0
--e git+https://github.com/agirishkumar/AutoDataPreprocess.git@21f7db23e21247fbdd6387c79baa8bfadc8edac8#egg=AutoDataPreprocess
+-e git+https://github.com/agirishkumar/AutoDataPreprocess.git@780ff84d1662d9f5bf0b5b2666714badf35c0503#egg=AutoDataPreprocess
+category-encoders==2.6.3
 certifi==2024.7.4
 charset-normalizer==3.3.2
 comm==0.2.2

@@ -48,21 +48,21 @@ AutoDataPreprocess is a powerful, easy-to-use Python library for automatic prepr
 - [x] Date/time feature extractor
 - [x] Text feature extractor
 - [x] Binning for numerical features
-- [ ] Mathematical transformations (log, square root, etc.)
+- [x] Mathematical transformations (log, square root, etc.)
 
 ## 6. Encoding
-- [ ] One-hot encoder
-- [ ] Label encoder
-- [ ] Ordinal encoder
-- [ ] Target encoder
-- [ ] Frequency encoder
-- [ ] Binary encoder
+- [x] One-hot encoder
+- [x] Label encoder
+- [x] Ordinal encoder
+- [x] Target encoder
+- [x] Frequency encoder
+- [x] Binary encoder
 
 ## 7. Scaling and Normalization
-- [ ] Standard scaler (Z-score normalization)
-- [ ] Min-Max scaler
-- [ ] Robust scaler
-- [ ] Normalizer (L1, L2, Max)
+- [x] Standard scaler (Z-score normalization)
+- [x] Min-Max scaler
+- [x] Robust scaler
+- [x] Normalizer (L1, L2, Max)
 
 ## 8. Dimensionality Reduction
 - [ ] Principal Component Analysis (PCA)
@@ -85,11 +85,6 @@ AutoDataPreprocess is a powerful, easy-to-use Python library for automatic prepr
 - [ ] Seasonality adjuster
 - [ ] Lag feature creator
 
-## 11. Text Data Preprocessing
-- [ ] Tokenizer
-- [ ] Stemmer/Lemmatizer
-- [ ] Stop word remover
-- [ ] TF-IDF transformer
 
 ## 12. Data Validation
 - [ ] Schema validator
