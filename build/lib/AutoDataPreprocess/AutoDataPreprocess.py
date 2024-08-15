@@ -33,7 +33,6 @@ import random
 import string
 
 
-VarianceThreshold
 class AutoDataPreprocess:
     def __init__(self, filepath=None, sql_query=None, sql_connection_string=None, api_url=None, api_params=None):
         """
@@ -382,24 +381,31 @@ class AutoDataPreprocess:
         return df.drop(columns=cols_to_drop)
 
     def handle_missing_values(self, df, strategy='mean', fill_value=None):
-        """
-        Handle missing values in the dataset.
-        """
+        if df.empty:
+            print("The DataFrame is empty. No missing values to handle.")
+            return df
+
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        categorical_columns = df.select_dtypes(include=['object', 'category']).columns
+        
+        if numeric_columns.empty and categorical_columns.empty:
+            print("No numeric or categorical columns to handle.")
+            return df
+
         if strategy == 'drop':
             print("Dropping rows with missing values.")
             return df.dropna()
         
-        numeric_columns = df.select_dtypes(include=[np.number]).columns
-        categorical_columns = df.select_dtypes(include=['object']).columns
-        
-        if strategy in ['mean', 'median', 'mode']:
+        if strategy in ['mean', 'median', 'most_frequent']:
             print(f"Imputing missing values using {strategy} strategy for numeric columns.")
             num_imputer = SimpleImputer(strategy=strategy)
-            df[numeric_columns] = num_imputer.fit_transform(df[numeric_columns])
+            if not numeric_columns.empty:
+                df[numeric_columns] = num_imputer.fit_transform(df[numeric_columns])
             
             print("Imputing missing values using 'most_frequent' strategy for categorical columns.")
             cat_imputer = SimpleImputer(strategy='most_frequent')
-            df[categorical_columns] = cat_imputer.fit_transform(df[categorical_columns])
+            if not categorical_columns.empty:
+                df[categorical_columns] = cat_imputer.fit_transform(df[categorical_columns])
         
         elif strategy == 'ffill':
             print("Forward filling missing values.")
@@ -415,25 +421,31 @@ class AutoDataPreprocess:
             print(f"Filling missing values with custom value: {fill_value}")
             df = df.fillna(value=fill_value)
 
-
         elif strategy == 'knn':
             print("Imputing missing values using KNN strategy.")
             imputer = KNNImputer(n_neighbors=5)
-            df[numeric_columns] = imputer.fit_transform(df[numeric_columns])
+            if not numeric_columns.empty:
+                df[numeric_columns] = imputer.fit_transform(df[numeric_columns])
         
         elif strategy == 'mice':
             print("Imputing missing values using MICE strategy.")
             imputer = IterativeImputer(random_state=0)
-            df[numeric_columns] = imputer.fit_transform(df[numeric_columns])
+            if not numeric_columns.empty:
+                df[numeric_columns] = imputer.fit_transform(df[numeric_columns])
         
         return df
 
     def handle_outliers(self, df, method, contamination):
-        """
-        Handle outliers in the dataset.
-        """
+        if df.empty:
+            print("The DataFrame is empty. No outliers to handle.")
+            return df
+        
         numeric_columns = df.select_dtypes(include=[np.number]).columns
         
+        if numeric_columns.empty:
+            print("No numeric columns to handle outliers.")
+            return df
+
         if method == 'iqr':
             print("Handling outliers using IQR method.")
             for col in numeric_columns:
@@ -529,6 +541,10 @@ class AutoDataPreprocess:
 
         # Start cleaning process
         print("Starting data cleaning process...")
+
+        if df.empty:
+            print("The DataFrame is empty. No cleaning to perform.")
+            return df
 
         df = self.drop_columns_with_missing_values(df, drop_threshold)
         df = self.handle_missing_values(df, strategy=missing, fill_value=fill_value)
@@ -824,7 +840,12 @@ class AutoDataPreprocess:
         pandas.DataFrame: DataFrame with scaled features.
         """
         df = self.data.copy()
-        print(f"Starting scaling process using {method} scaling.")
+        if df.empty:
+            print("The DataFrame is empty. No scaling to perform.")
+            return df
+
+        df = self.replace_infinity(df)  # Replace infinity values with NaN before scaling
+        df = self.handle_missing_values(df, strategy='mean')  # Handle any remaining NaN values
 
         if columns is None:
             columns = df.select_dtypes(include=[np.number]).columns
@@ -841,7 +862,8 @@ class AutoDataPreprocess:
         else:
             raise ValueError(f"Unknown scaling method '{method}'.")
 
-        df[columns] = scaler.fit_transform(df[columns])
+        if not columns.empty:
+            df[columns] = scaler.fit_transform(df[columns])
 
         print("Scaling process completed.")
         self.data = df
@@ -883,10 +905,17 @@ class AutoDataPreprocess:
         pandas.DataFrame: DataFrame with principal components.
         """
         df = self.data.select_dtypes(include=[np.number]).copy()  # Only numeric data
+        
+        if df.isnull().any().any():
+            print("Missing values detected. Handling missing values before applying PCA.")
+            df = self.handle_missing_values(df, strategy='mean')
+
+        if df.empty or df.shape[1] < n_components:
+            raise ValueError("Insufficient data to perform PCA.")
+
         pca = PCA(n_components=n_components)
         pca_components = pca.fit_transform(df)
         
-        # Create a DataFrame with the principal components
         pca_df = pd.DataFrame(data=pca_components, columns=[f'PC{i+1}' for i in range(n_components)])
         
         print(f"PCA completed with {n_components} components.")
