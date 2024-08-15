@@ -1,2 +1,9 @@
 autodatapreprocess
 tests/report.html
+ToDo.md
+.pytest_cache
+AutoDataPreprocess/__pycache__
+AutoDataPreprocess.egg-info
+tests
+*.log
+.DS_Store

@@ -1,5 +1,13 @@
+SQLAlchemy
+category-encoders
+imbalanced-learn
 matplotlib
 numpy
 pandas
+requests
 scikit-learn
+scipy
 seaborn
+statsmodels
+umap-learn
+ydata-profiling

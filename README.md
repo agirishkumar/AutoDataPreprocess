@@ -1,121 +1,167 @@
 # AutoDataPreprocess
-AutoDataPreprocess is a powerful, easy-to-use Python library for automatic preprocessing of tabular data. It streamlines your data science workflow by intelligently handling common preprocessing tasks with minimal user intervention.
 
-# Data Preprocessing Library Implementation Checklist
+AutoDataPreprocess is a comprehensive Python library for automated data preprocessing. It provides a wide range of tools and techniques to clean, transform, and prepare data for machine learning models.
 
-## 1. Core Components
-- [ ] BasePreprocessor abstract base class
-- [ ] DataLoader class
-- [ ] DataInspector class
-- [ ] Pipeline class
-- [ ] AutoPreprocessor class
+## Features
 
-## 2. Data Loading
-- [x] CSV file loading
-- [x] Excel file loading
-- [x] JSON file loading
-- [x] XML file loading
-- [x] Pickle file loading
-- [x] HTML file loading
-- [x] SQL database connector
-- [x] API data fetcher
+- Data loading from various sources (CSV, JSON, Excel, HTML, XML, Pickle, SQL, API)
+- Basic data analysis and visualization
+- Data cleaning (handling missing values, outliers, duplicates)
+- Feature engineering
+- Encoding of categorical variables (Onehot, label, ordinal, target, woe, james_stein, catboost, binary)
+- Scaling and normalization
+- Dimensionality reduction
+- Feature selection
+- Handling imbalanced data
+- Time series preprocessing
+- Data anonymization
 
-## 3. Data Inspection
-- [x] Basic statistics calculation (mean, median, mode, std dev)
-- [x] Missing value detection and reporting
-- [x] Data type inference
-- [x] Correlation analysis
+## Installation
 
-## 4. Data Cleaning
-- [x] Missing value handler
-  - [x] Mean imputation
-  - [x] Median imputation
-  - [x] Mode imputation
-  - [x] Forward fill
-  - [x] Backward fill
-  - [x] Custom value imputation
-- [x] Outlier handler
-  - [x] IQR method
-  - [x] Z-score method
-  - [x] Isolation Forest
-- [x] Duplicate row remover
-- [ ] Data type corrector
-- [x] String cleaner (whitespace, case normalization)
+You can install AutoDataPreprocess using pip: `pip install autodatapreprocess`
 
-## 5. Feature Engineering
-- [x] Polynomial feature creator
-- [x] Interaction term generator
-- [x] Date/time feature extractor
-- [x] Text feature extractor
-- [x] Binning for numerical features
-- [x] Mathematical transformations (log, square root, etc.)
+## Quick Start
 
-## 6. Encoding
-- [x] One-hot encoder
-- [x] Label encoder
-- [x] Ordinal encoder
-- [x] Target encoder
-- [x] Frequency encoder
-- [x] Binary encoder
+```python
+from autodatapreprocess import AutoDataPreprocess
 
-## 7. Scaling and Normalization
-- [x] Standard scaler (Z-score normalization)
-- [x] Min-Max scaler
-- [x] Robust scaler
-- [x] Normalizer (L1, L2, Max)
+# Load data
+adp = AutoDataPreprocess('your_data_file.csv')
 
-## 8. Dimensionality reduction and Feature Selection
-- [x] Principal Component Analysis (PCA)
-- [x] t-SNE
-- [x] UMAP
-- [x] Feature selector
-  - [x] Correlation-based
-  - [x] Mutual information
-  - [x] Variance threshold
+# Perform basic analysis
+adp.basic_analysis()
 
-## 9. Handling Imbalanced Data
-- [x] Random over-sampler
-- [x] SMOTE
-- [x] Random under-sampler
-- [x] Tomek links
+# Clean the data
+cleaned_data = adp.clean(missing='mean', outliers='iqr')
 
-## 10. Time Series Preprocessing
-- [x] Resampler
-- [x] Detrending
-- [x] Seasonality adjuster
-- [x] Lag feature creator
-- [x] Rolling Statistics
-- [x] Differencing
-- [x] Fourier Transform
+# Perform feature engineering
+engineered_data = adp.fe(target_column='target', polynomial_degree=2)
 
-## 13. Data Anonymization
-- [x] Hash function for sensitive information
-- [x] Data masking tool
-- [x] Randomization
+# Encode categorical variables
+encoded_data = adp.encode(methods={'category_column': 'onehot'})
 
-## 19. Testing
-- [ ] Unit tests for each component
-- [ ] Integration tests for pipelines
-- [ ] Performance benchmarks
+# Scale the data
+scaled_data = adp.scale(method='standard')
 
-## 20. Documentation
-- [ ] API documentation
-- [ ] User guide
-- [ ] Tutorials and examples
-- [ ] Contribution guidelines
+```
 
-## 21. Packaging and Distribution
-- [ ] Setup.py file
-- [ ] Requirements.txt
-- [ ] PyPI package preparation
-- [ ] Conda package preparation
+## Detailed Usage
 
-## 22. Continuous Integration/Continuous Deployment
-- [ ] CI/CD pipeline setup
-- [ ] Automated testing on multiple Python versions
-- [ ] Code coverage reporting
+### Data Loading
+Load data from various sources:
 
-## 23. Community and Support
-- [ ] GitHub repository setup
-- [ ] Issue tracker
-- [ ] Discussion forum or mailing list
+```python
+# From CSV
+adp = AutoDataPreprocess('data.csv')
+
+# From SQL
+adp = AutoDataPreprocess(sql_query="SELECT * FROM table", sql_connection_string="your_connection_string")
+
+# From API
+adp = AutoDataPreprocess(api_url="https://api.example.com/data", api_params={"key": "value"})
+```
+### Data Cleaning
+Clean your data with various options:
+
+```python
+cleaned_data = adp.clean(
+    missing='mean',
+    outliers='iqr',
+    drop_threshold=0.7,
+    date_format='%Y-%m-%d',
+    remove_duplicates=True
+)
+```
+
+### Feature Engineering
+Perform feature engineering:
+
+```python
+engineered_data = adp.fe(
+    target_column='target',
+    polynomial_degree=2,
+    interaction_only=False,
+    bin_numeric=True,
+    num_bins=5,
+    cyclical_features=['month', 'day_of_week'],
+    text_columns=['description'],
+    date_columns=['date']
+)
+```
+
+### Encoding
+Encode categorical variables:
+
+```python
+encoded_data = adp.encode(
+    methods={
+        'category1': 'onehot',
+        'category2': 'label',
+        'category3': 'target'
+    },
+    target_column='target'
+)
+```
+
+### Scaling and Normalization
+Scale or normalize your data:
+
+```python
+scaled_data = adp.scale(method='standard')
+normalized_data = adp.normalize(method='l2')
+```
+
+### Dimensionality Reduction
+Reduce the dimensionality of your data:
+
+```python
+reduced_data = adp.dimreduction(method='pca', n_components=5)
+```
+
+### Feature Selection
+Select the most important features:
+
+```python
+selected_data = adp.feature_selection(
+    target_column='target',
+    method='correlation',
+    correlation_threshold=0.8
+)
+```
+
+### Handling Imbalanced Data
+Balance your dataset:
+
+```python
+balanced_data = adp.balance_data(
+    target_column='target',
+    method='smote',
+    sampling_strategy='auto'
+)
+```
+
+### Time Series Preprocessing
+Preprocess time series data:
+
+```python
+preprocessed_ts_data = adp.time_series_preprocessing(
+    time_column='date',
+    freq='D',
+    method='mean',
+    detrend_columns=['value'],
+    seasonality_columns=['value'],
+    lag_columns=['value'],
+    lags=[1, 7, 30]
+)
+```
+
+### Data Anonymization
+Anonymize sensitive data:
+
+```python
+anonymized_data = adp.apply_anonymization(
+    columns=['sensitive_column'],
+    method='hash',
+    hash_algorithm='sha256'
+)
+```

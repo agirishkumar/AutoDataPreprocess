@@ -10,6 +10,15 @@ setup(
         "matplotlib",
         "seaborn",
         "scikit-learn",
+        "category-encoders",
+        "ydata-profiling",
+        "SQLAlchemy",
+        "umap-learn",
+        "requests",
+        "statsmodels",
+        "scipy",
+        "imbalanced-learn"
+
     ],
     author="Girish Kumar Adari",
     author_email="adari.girishkumar@gmail.com",
