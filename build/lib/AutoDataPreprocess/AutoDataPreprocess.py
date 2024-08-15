@@ -409,11 +409,11 @@ class AutoDataPreprocess:
         
         elif strategy == 'ffill':
             print("Forward filling missing values.")
-            df = df.fillna(method='ffill')
+            df = df.ffill()
 
         elif strategy == 'bfill':
             print("Backward filling missing values.")
-            df = df.fillna(method='bfill')
+            df = df.bfill()
 
         elif strategy == 'constant':
             if fill_value is None:
@@ -780,7 +780,7 @@ class AutoDataPreprocess:
 
     def _onehot_encode(self, df, column):
         print(f"Applying One-Hot encoding to column: {column}")
-        encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
+        encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
         encoded = encoder.fit_transform(df[[column]])
         encoded_df = pd.DataFrame(encoded, columns=[f"{column}_{cat}" for cat in encoder.categories_[0]])
         return pd.concat([df.drop(columns=[column]), encoded_df], axis=1)
@@ -831,11 +831,9 @@ class AutoDataPreprocess:
     def scale(self, method='standard', columns=None):
         """
         Scale numerical features in the dataset.
-
         Parameters:
         method (str): Scaling method to use. Options: 'standard', 'minmax', 'robust'.
         columns (list): List of columns to scale. If None, scales all numeric columns.
-
         Returns:
         pandas.DataFrame: DataFrame with scaled features.
         """
@@ -852,18 +850,20 @@ class AutoDataPreprocess:
 
         if method == 'standard':
             print(f"Applying Standard scaling to columns: {columns}")
-            scaler = StandardScaler()
+            scaler = StandardScaler(with_std=False)
+            df[columns] = scaler.fit_transform(df[columns])
+            # Manually apply sample standard deviation
+            df[columns] = df[columns] / df[columns].std(ddof=1)
         elif method == 'minmax':
             print(f"Applying Min-Max scaling to columns: {columns}")
             scaler = MinMaxScaler()
+            df[columns] = scaler.fit_transform(df[columns])
         elif method == 'robust':
             print(f"Applying Robust scaling to columns: {columns}")
             scaler = RobustScaler()
+            df[columns] = scaler.fit_transform(df[columns])
         else:
             raise ValueError(f"Unknown scaling method '{method}'.")
-
-        if not columns.empty:
-            df[columns] = scaler.fit_transform(df[columns])
 
         print("Scaling process completed.")
         self.data = df
@@ -902,25 +902,26 @@ class AutoDataPreprocess:
         n_components (int): Number of principal components to keep.
 
         Returns:
-        pandas.DataFrame: DataFrame with principal components.
+        pandas.DataFrame: DataFrame with original columns and principal components.
         """
-        df = self.data.select_dtypes(include=[np.number]).copy()  # Only numeric data
+        df = self.data.copy()
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
         
-        if df.isnull().any().any():
+        if df[numeric_columns].isnull().any().any():
             print("Missing values detected. Handling missing values before applying PCA.")
-            df = self.handle_missing_values(df, strategy='mean')
+            df[numeric_columns] = self.handle_missing_values(df[numeric_columns], strategy='mean')
 
-        if df.empty or df.shape[1] < n_components:
-            raise ValueError("Insufficient data to perform PCA.")
+        if numeric_columns.empty or len(numeric_columns) < n_components:
+            raise ValueError("Insufficient numeric data to perform PCA.")
 
         pca = PCA(n_components=n_components)
-        pca_components = pca.fit_transform(df)
+        pca_components = pca.fit_transform(df[numeric_columns])
         
         pca_df = pd.DataFrame(data=pca_components, columns=[f'PC{i+1}' for i in range(n_components)])
         
         print(f"PCA completed with {n_components} components.")
         
-        return pd.concat([self.data.drop(columns=df.columns), pca_df], axis=1)
+        return pd.concat([df, pca_df], axis=1)
 
     def tsne_reduction(self, n_components=2, perplexity=30.0, n_iter=1000):
         """
@@ -1278,7 +1279,12 @@ class AutoDataPreprocess:
         """
         for col in columns:
             print(f"\nAdjusting seasonality for column: {col}")
-            decomposition = seasonal_decompose(df[col], model=model, period=period)
+            # Handle missing values
+            series = df[col].interpolate()
+            if series.isnull().any():
+                print(f"Warning: Column {col} contains missing values that couldn't be interpolated. Skipping seasonal adjustment.")
+                continue
+            decomposition = seasonal_decompose(series, model=model, period=period)
             df[f'{col}_seasonal_adjusted'] = df[col] - decomposition.seasonal if model == 'additive' else df[col] / decomposition.seasonal
         return df
 
@@ -1297,45 +1303,6 @@ class AutoDataPreprocess:
         for col in columns:
             for lag in lags:
                 df[f'{col}_lag_{lag}'] = df[col].shift(lag)
-        return df
-
-    def time_series_preprocessing(self, time_column, freq='D', method='mean', detrend_columns=None, seasonality_columns=None,
-                                  seasonality_model='additive', seasonality_period=None, lag_columns=None, lags=[1, 2, 3]):
-        """
-        Perform comprehensive time series preprocessing including resampling, detrending, seasonality adjustment, and lag feature creation.
-
-        Parameters:
-        time_column (str): The name of the column containing the datetime information.
-        freq (str): The frequency to resample the data to.
-        method (str): The method to apply for aggregation in resampling.
-        detrend_columns (list): List of column names to detrend.
-        seasonality_columns (list): List of column names to adjust for seasonality.
-        seasonality_model (str): The type of seasonal adjustment ('additive' or 'multiplicative').
-        seasonality_period (int): The periodicity of the seasonality.
-        lag_columns (list): List of column names to create lag features for.
-        lags (list): List of lag periods to create features for.
-
-        Returns:
-        pandas.DataFrame: Preprocessed DataFrame.
-        """
-        df = self.data.copy()
-
-        print("\nResampling the time series data...")
-        df = self.resample_time_series(df, time_column, freq, method)
-
-        if detrend_columns:
-            print("\nDetrending the time series data...")
-            df = self.detrend_time_series(df, detrend_columns)
-
-        if seasonality_columns:
-            print("\nAdjusting for seasonality...")
-            df = self.adjust_seasonality(df, seasonality_columns, model=seasonality_model, period=seasonality_period)
-
-        if lag_columns:
-            print("\nCreating lag features...")
-            df = self.create_lag_features(df, lag_columns, lags)
-
-        self.data = df
         return df
     
     def rolling_statistics(self, df, columns, window=3, statistics=['mean', 'std']):
@@ -1433,6 +1400,10 @@ class AutoDataPreprocess:
         pandas.DataFrame: Preprocessed DataFrame.
         """
         df = self.data.copy()
+
+        # Handle missing values
+        print("Handling missing values")
+        df = df.interpolate()
 
         print("Resampling time series data")
         df = self.resample_time_series(df, time_column, freq, method)
