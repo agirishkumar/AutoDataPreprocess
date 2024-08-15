@@ -33,7 +33,6 @@ import random
 import string
 
 
-VarianceThreshold
 class AutoDataPreprocess:
     def __init__(self, filepath=None, sql_query=None, sql_connection_string=None, api_url=None, api_params=None):
         """

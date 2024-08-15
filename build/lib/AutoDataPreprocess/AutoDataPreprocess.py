@@ -17,7 +17,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.linear_model import Lasso, Ridge
 from sklearn.feature_selection import SelectFromModel, VarianceThreshold
-from category_encoders import TargetEncoder, WOEEncoder, JamesSteinEncoder, CatBoostEncoder, FrequencyEncoder, BinaryEncoder
+from category_encoders import TargetEncoder, WOEEncoder, JamesSteinEncoder, CatBoostEncoder, BinaryEncoder
 import os
 import umap
 from ydata_profiling import ProfileReport
@@ -714,7 +714,7 @@ class AutoDataPreprocess:
 
         Parameters:
         methods (dict): A dictionary where keys are column names and values are encoding methods.
-                        Supported methods: 'onehot', 'label', 'ordinal', 'target', 'woe', 'james_stein', 'catboost', , 'frequency', 'binary'
+                        Supported methods: 'onehot', 'label', 'ordinal', 'target', 'woe', 'james_stein', 'catboost',  'binary'
         target_column (str): Name of the target column for supervised encoding methods
 
         Returns:
@@ -753,8 +753,6 @@ class AutoDataPreprocess:
                 if target_column is None:
                     raise ValueError("Target column must be specified for CatBoost encoding.")
                 df = self._catboost_encode(df, col, target_column)
-            elif method == 'frequency':
-                df = self._frequency_encode(df, col)
             elif method == 'binary':
                 df = self._binary_encode(df, col)
             else:
@@ -805,12 +803,6 @@ class AutoDataPreprocess:
         print(f"Applying CatBoost encoding to column: {column}")
         encoder = CatBoostEncoder()
         df[f"{column}_catboost_encoded"] = encoder.fit_transform(df[column], df[target_column])
-        return df
-    
-    def _frequency_encode(self, df, column):
-        print(f"Applying Frequency encoding to column: {column}")
-        encoder = FrequencyEncoder()
-        df[f"{column}_freq_encoded"] = encoder.fit_transform(df[column])
         return df
 
     def _binary_encode(self, df, column):

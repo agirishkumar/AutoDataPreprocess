@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: AutoDataPreprocess
-Version: 0.1.1
+Version: 0.1.2
 Summary: A high-level library for automatic preprocessing of tabular data
 Home-page: https://github.com/agirishkumar/AutoDataPreprocess
 Author: Girish Kumar Adari
@@ -24,7 +24,7 @@ AutoDataPreprocess is a comprehensive Python library for automated data preproce
 - Basic data analysis and visualization
 - Data cleaning (handling missing values, outliers, duplicates)
 - Feature engineering
-- Encoding of categorical variables (Onehot, label, ordinal, target, woe, james_stein, catboost, frequency, binary)
+- Encoding of categorical variables (Onehot, label, ordinal, target, woe, james_stein, catboost, binary)
 - Scaling and normalization
 - Dimensionality reduction
 - Feature selection
