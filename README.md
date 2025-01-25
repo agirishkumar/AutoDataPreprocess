@@ -1,3 +1,5 @@
+[![PyPI Downloads](https://static.pepy.tech/badge/autodatapreprocess)](https://pepy.tech/projects/autodatapreprocess)
+
 # AutoDataPreprocess
 
 AutoDataPreprocess is a comprehensive Python library for automated data preprocessing. It provides a wide range of tools and techniques to clean, transform, and prepare data for machine learning models.
